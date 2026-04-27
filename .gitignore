@@ -1,0 +1,4 @@
+node_modules/
+ups_cookies.txt
+.env
+*.log

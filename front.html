@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kurye Çağır | UPS - Kendi Yazılımınız</title>
+    <style>
+        :root { --ups-brown: #351c15; }
+        body { font-family: Arial, sans-serif; background: #f8f9fa; margin:0; padding:20px; }
+        .container { max-width: 850px; margin:0 auto; background:white; border-radius:12px; box-shadow:0 10px 35px rgba(0,0,0,0.12); overflow:hidden; }
+        header { background:var(--ups-brown); color:white; padding:18px 25px; display:flex; justify-content:space-between; align-items:center; }
+        .logo { font-size:26px; font-weight:bold; }
+        .title { padding:16px 25px; background:#f1f1f1; font-size:20px; font-weight:bold; color:var(--ups-brown); }
+        form { padding:25px; }
+        .section { border:1px solid #ddd; border-radius:10px; margin-bottom:22px; overflow:hidden; }
+        .section h2 { background:#f8f8f8; margin:0; padding:14px 20px; font-size:17px; color:var(--ups-brown); }
+        .section-body { padding:20px; }
+        label { display:block; margin:8px 0 4px; font-weight:600; font-size:14.5px; }
+        input, select, textarea { width:100%; padding:10px 12px; border:1px solid #bbb; border-radius:6px; box-sizing:border-box; }
+        .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .radio-group, .checkbox-group { display:flex; flex-wrap:wrap; gap:14px; margin:8px 0; }
+        button { padding:14px 28px; font-size:16px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; background:#351c15; color:white; }
+        .hidden { display:none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="logo">UPS</div>
+        <div>UPS HIZLI KARGO TAŞ. A.Ş.<br>0850 255 00 66 | www.ups.com.tr</div>
+    </header>
+
+    <div class="title">Kurye Çağır Formu - Kendi Yazılımınız</div>
+
+    <form id="upsForm">
+        <!-- Talebi Oluşturan -->
+        <div class="section">
+            <h2>Talebi Oluşturan</h2>
+            <div class="section-body">
+                <label>Ad Soyad</label>
+                <input type="text" id="requesterName" value="Ahmet Yılmaz" required>
+
+                <label>Cep Telefonu</label>
+                <input type="tel" id="requesterPhone" maxlength="11" value="05551234567" placeholder="05........." required>
+
+                <label>Firma Adı</label>
+                <input type="text" id="requesterCompany" value="Örnek Firma Ltd.">
+
+                <label>Adres</label>
+                <input type="text" id="requesterAddress" value="Örnek Mah. Test Sok. No: 12">
+
+                <div class="grid-2">
+                    <div>
+                        <label>Şehir</label>
+                        <select id="requesterCity"></select>
+                    </div>
+                    <div>
+                        <label>Semt / İlçe</label>
+                        <select id="requesterDistrict"></select>
+                    </div>
+                </div>
+
+                <label>Paketi Teslim Edecek Kişi</label>
+                <input type="text" id="pickupContactName" value="Ahmet Yılmaz">
+
+                <label>
+                    <input type="checkbox" id="pickupSameAddress" checked> Alım yapılacak adres aynı
+                </label>
+            </div>
+        </div>
+
+        <!-- Paketin Alınacağı Adres -->
+        <div class="section hidden" id="pickupAddressSection">
+            <h2>Paketin Alınacağı Adres</h2>
+            <div class="section-body">
+                <label>Firma Adı</label>
+                <input type="text" id="pickupCompany">
+
+                <label>Adres</label>
+                <input type="text" id="pickupAddress">
+
+                <div class="grid-2">
+                    <div>
+                        <label>Şehir</label>
+                        <select id="pickupCity"></select>
+                    </div>
+                    <div>
+                        <label>Semt / İlçe</label>
+                        <select id="pickupDistrict"></select>
+                    </div>
+                </div>
+
+                <label>Paketi Teslim Edecek Kişi</label>
+                <input type="text" id="pickupAddressContactName">
+
+                <label>Cep Telefonu</label>
+                <input type="tel" id="pickupPhone" maxlength="11" placeholder="05.........">
+            </div>
+        </div>
+
+        <!-- Gönderi Bilgileri (kısaltılmış) -->
+        <div class="section">
+            <h2>Gönderi Bilgileri</h2>
+            <div class="section-body">
+                <label>Not</label>
+                <textarea id="note" rows="3">Otomatik dolduruldu.</textarea>
+
+                <br>
+                <label><input type="checkbox" id="acceptKvkk" checked> Aydınlatma Metnini Okudum, Kabul Ediyorum</label>
+                <label><input type="checkbox" id="acceptCommercialMessage"> Ticari İleti Onay Metnini Okudum, Kabul Ediyorum</label>
+            </div>
+        </div>
+
+        <div style="text-align:center; padding:30px 0;">
+            <button type="submit">UPS Kurye Talebi Oluştur<br><small>(Token otomatik alınır)</small></button>
+            <div id="formResult" style="margin-top:16px; font-weight:600;"></div>
+        </div>
+    </form>
+</div>
+
+<script>
+// ====================== İL VE İLÇE - UPS LOKASYON SERVISI ======================
+const LOCATION_API = "pickup_locations.php";
+
+function getRows(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.data)) return data.data;
+    if (data && data.data && Array.isArray(data.data.data)) return data.data.data;
+    return [];
+}
+
+async function loadProvinces() {
+    try {
+        const res = await fetch(`${LOCATION_API}?type=city`);
+        const json = await res.json();
+        const provinces = getRows(json);
+
+        ["requesterCity", "pickupCity"].forEach(id => {
+            const select = document.getElementById(id);
+            select.innerHTML = '<option value="">İl Seçiniz</option>';
+            provinces.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p.tanimi || p.name || "";
+                opt.textContent = p.tanimi || p.name || "";
+                opt.dataset.cityId = p.kodu || p.id || "";
+                select.appendChild(opt);
+            });
+            select.value = "İSTANBUL";
+        });
+
+        loadDistricts("requesterCity", "requesterDistrict");
+        loadDistricts("pickupCity", "pickupDistrict");
+    } catch (e) {
+        console.error("İller yüklenemedi", e);
+    }
+}
+
+async function loadDistricts(citySelectId, districtSelectId) {
+    const citySelect = document.getElementById(citySelectId);
+    const city = citySelect.value.trim();
+    const cityId = citySelect.selectedOptions[0]?.dataset.cityId;
+    if (!city || !cityId) return;
+
+    const districtSelect = document.getElementById(districtSelectId);
+    districtSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+
+    try {
+        const res = await fetch(`${LOCATION_API}?type=district&cityid=${encodeURIComponent(cityId)}`);
+        const json = await res.json();
+        const districts = getRows(json);
+
+        districtSelect.innerHTML = '<option value="">İlçe Seçiniz</option>';
+        districts.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d.tanimi || d.name || "";
+            opt.textContent = d.tanimi || d.name || "";
+            opt.dataset.districtId = d.siraNo || d.id || "";
+            districtSelect.appendChild(opt);
+        });
+
+        const kadikoy = Array.from(districtSelect.options).find(opt => opt.value.includes("KADIK"));
+        if (kadikoy) districtSelect.value = kadikoy.value;
+    } catch (e) {
+        console.error("İlçeler yüklenemedi", e);
+        districtSelect.innerHTML = '<option value="">İlçe yüklenemedi</option>';
+    }
+}
+
+// Event'ler
+document.getElementById("requesterCity").addEventListener("change", () => loadDistricts("requesterCity", "requesterDistrict"));
+document.getElementById("pickupCity").addEventListener("change", () => loadDistricts("pickupCity", "pickupDistrict"));
+
+document.getElementById("pickupSameAddress").addEventListener("change", function() {
+    document.getElementById("pickupAddressSection").classList.toggle("hidden", this.checked);
+});
+
+const productReturn = document.getElementById("productReturn");
+const returnNoteSection = document.getElementById("returnNoteSection");
+if (productReturn && returnNoteSection) {
+    productReturn.addEventListener("change", function() {
+        returnNoteSection.classList.toggle("hidden", !this.checked);
+    });
+}
+
+function getSelectedOption(selectId) {
+    const select = document.getElementById(selectId);
+    return select.selectedOptions[0] || null;
+}
+
+// Form Submit
+document.getElementById("upsForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const pickupSame = document.getElementById("pickupSameAddress").checked;
+    const requesterCityOption = getSelectedOption("requesterCity");
+    const requesterDistrictOption = getSelectedOption("requesterDistrict");
+    const pickupCityOption = pickupSame ? requesterCityOption : getSelectedOption("pickupCity");
+    const pickupDistrictOption = pickupSame ? requesterDistrictOption : getSelectedOption("pickupDistrict");
+    const submitButton = this.querySelector('button[type="submit"]');
+    const resultBox = document.getElementById("formResult");
+
+    const data = {
+        requesterName: document.getElementById("requesterName").value,
+        requesterPhone: document.getElementById("requesterPhone").value,
+        requesterCompany: document.getElementById("requesterCompany").value,
+        requesterAddress: document.getElementById("requesterAddress").value,
+        requesterCity: document.getElementById("requesterCity").value,
+        requesterCityId: requesterCityOption?.dataset.cityId || "",
+        requesterDistrict: document.getElementById("requesterDistrict").value,
+        requesterDistrictId: requesterDistrictOption?.dataset.districtId || "",
+        pickupSameAddress: pickupSame,
+        pickupContactName: document.getElementById("pickupContactName").value,
+        pickupCompany: pickupSame ? document.getElementById("requesterCompany").value : document.getElementById("pickupCompany").value,
+        pickupAddress: pickupSame ? document.getElementById("requesterAddress").value : document.getElementById("pickupAddress").value,
+        pickupCity: pickupSame ? document.getElementById("requesterCity").value : document.getElementById("pickupCity").value,
+        pickupCityId: pickupCityOption?.dataset.cityId || "",
+        pickupDistrict: pickupSame ? document.getElementById("requesterDistrict").value : document.getElementById("pickupDistrict").value,
+        pickupDistrictId: pickupDistrictOption?.dataset.districtId || "",
+        pickupPhone: pickupSame ? document.getElementById("requesterPhone").value : document.getElementById("pickupPhone").value,
+        pickupAddressContactName: pickupSame ? document.getElementById("pickupContactName").value : document.getElementById("pickupAddressContactName").value,
+        packageCount: "1",
+        note: document.getElementById("note").value,
+        acceptKvkk: document.getElementById("acceptKvkk").checked,
+        acceptCommercialMessage: document.getElementById("acceptCommercialMessage").checked
+    };
+
+    resultBox.style.color = "#351c15";
+    resultBox.textContent = "Talep UPS'e gönderiliyor...";
+    submitButton.disabled = true;
+
+    try {
+        const res = await fetch("save_pickup.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+
+        if (!result.success) {
+            resultBox.style.color = "#b00020";
+            resultBox.textContent = result.errorCode !== undefined && result.errorCode !== null
+                ? `${result.message || "Talep gönderilemedi."} Kod: ${result.errorCode}`
+                : (result.message || "Talep gönderilemedi.");
+            console.log("UPS sonucu:", result);
+            return;
+        }
+
+        const trackingNo = result.upsResponse?.data?.cagriSiraNo;
+        resultBox.style.color = "#166534";
+        resultBox.textContent = trackingNo
+            ? `Talep oluşturuldu. Takip no: ${trackingNo}`
+            : "UPS yanıt verdi, talep sonucu konsola yazıldı.";
+        console.log("UPS sonucu:", result);
+    } catch (err) {
+        resultBox.style.color = "#b00020";
+        resultBox.textContent = "Talep gönderilirken hata oluştu.";
+        console.error(err);
+    } finally {
+        submitButton.disabled = false;
+    }
+});
+
+window.onload = loadProvinces;
+</script>
+</body>
+</html>
