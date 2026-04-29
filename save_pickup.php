@@ -182,7 +182,6 @@ $postModel = [
     'CagriKaynagi' => 'KendiForm',
     'CariMusteri' => 'false',
     'MusteriKod' => '',
-    'GonderiTipi_Yurtdisi' => '',
 ];
 
 $ch = curl_init('https://apps.ups.com.tr/PickupRequest/callsave');
