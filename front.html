@@ -21,6 +21,15 @@
         .radio-group, .checkbox-group { display:flex; flex-wrap:wrap; gap:14px; margin:8px 0; }
         button { padding:14px 28px; font-size:16px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; background:#351c15; color:white; }
         .hidden { display:none; }
+        .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; padding:20px; z-index:1000; }
+        .modal-backdrop.open { display:flex; }
+        .modal { width:min(520px, 100%); background:#fff; border-radius:8px; box-shadow:0 18px 50px rgba(0,0,0,0.28); overflow:hidden; }
+        .modal-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 18px; border-bottom:1px solid #e5e7eb; }
+        .modal-header h3 { margin:0; font-size:18px; color:#351c15; }
+        .modal-close { width:34px; height:34px; padding:0; border-radius:50%; background:#f3f4f6; color:#111827; font-size:22px; line-height:1; }
+        .modal-body { padding:18px; color:#1f2937; line-height:1.45; white-space:pre-wrap; }
+        .modal-footer { padding:14px 18px 18px; text-align:right; }
+        .modal-footer button { padding:10px 18px; font-size:14px; }
     </style>
 </head>
 <body>
@@ -119,6 +128,19 @@
     </form>
 </div>
 
+<div class="modal-backdrop" id="errorModal" role="dialog" aria-modal="true" aria-labelledby="errorModalTitle">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="errorModalTitle">Hata</h3>
+            <button type="button" class="modal-close" id="errorModalClose" aria-label="Kapat">&times;</button>
+        </div>
+        <div class="modal-body" id="errorModalMessage"></div>
+        <div class="modal-footer">
+            <button type="button" id="errorModalOk">Tamam</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ====================== İL VE İLÇE - UPS LOKASYON SERVISI ======================
 const LOCATION_API = "pickup_locations.php";
@@ -208,6 +230,25 @@ function getSelectedOption(selectId) {
     return select.selectedOptions[0] || null;
 }
 
+function showErrorModal(message, title = "Hata") {
+    document.getElementById("errorModalTitle").textContent = title;
+    document.getElementById("errorModalMessage").textContent = message;
+    document.getElementById("errorModal").classList.add("open");
+}
+
+function closeErrorModal() {
+    document.getElementById("errorModal").classList.remove("open");
+}
+
+document.getElementById("errorModalClose").addEventListener("click", closeErrorModal);
+document.getElementById("errorModalOk").addEventListener("click", closeErrorModal);
+document.getElementById("errorModal").addEventListener("click", function(e) {
+    if (e.target === this) closeErrorModal();
+});
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closeErrorModal();
+});
+
 // Form Submit
 document.getElementById("upsForm").addEventListener("submit", async function(e) {
     e.preventDefault();
@@ -257,11 +298,25 @@ document.getElementById("upsForm").addEventListener("submit", async function(e) 
         });
         const result = await res.json();
 
+        if (result.duplicate) {
+            const trackingNo = result.upsResponse?.data?.cagriSiraNo;
+            const duplicateMessage = trackingNo
+                ? `${result.message || "Bu talep zaten oluşturuldu."}\nTakip no: ${trackingNo}`
+                : (result.message || "Bu talep zaten oluşturuldu.");
+            resultBox.style.color = "#92400e";
+            resultBox.textContent = "Bu talep daha önce oluşturulmuş.";
+            showErrorModal(duplicateMessage, "Tekrarlanan Talep");
+            console.log("UPS sonucu:", result);
+            return;
+        }
+
         if (!result.success) {
-            resultBox.style.color = "#b00020";
-            resultBox.textContent = result.errorCode !== undefined && result.errorCode !== null
-                ? `${result.message || "Talep gönderilemedi."} Kod: ${result.errorCode}`
+            const errorMessage = result.errorCode !== undefined && result.errorCode !== null
+                ? `${result.message || "Talep gönderilemedi."}\nKod: ${result.errorCode}`
                 : (result.message || "Talep gönderilemedi.");
+            resultBox.style.color = "#b00020";
+            resultBox.textContent = "Talep gönderilemedi.";
+            showErrorModal(errorMessage, "Talep Gönderilemedi");
             console.log("UPS sonucu:", result);
             return;
         }
@@ -275,6 +330,7 @@ document.getElementById("upsForm").addEventListener("submit", async function(e) 
     } catch (err) {
         resultBox.style.color = "#b00020";
         resultBox.textContent = "Talep gönderilirken hata oluştu.";
+        showErrorModal("Talep gönderilirken beklenmeyen bir hata oluştu. Detay için tarayıcı konsolunu kontrol edin.", "Bağlantı Hatası");
         console.error(err);
     } finally {
         submitButton.disabled = false;

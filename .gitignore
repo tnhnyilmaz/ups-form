@@ -1,4 +1,5 @@
 node_modules/
 ups_cookies.txt
+storage/
 .env
 *.log
